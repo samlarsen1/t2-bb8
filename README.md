@@ -20,7 +20,7 @@ t2-bb8/
 │   ├── harvest.py   # delete previous outputs → fetch → validate → join exchanges → write
 │   └── storage.py   # atomic JSON/text writers
 ├── tests/           # mocked-API tests
-└── data/            # output (gitignored)
+└── data/            # output (committed to git)
 ```
 
 Each run calls two Trading212 endpoints:
@@ -88,6 +88,14 @@ half-written file.
 
 Instruments that fail validation (for example, no `ticker`) are skipped, logged as
 `instrument_invalid`, and counted in `manifest.json`.
+
+The `data/` folder is committed, so each harvest shows up as a diff. To record a new harvest:
+
+```bash
+uv run t2bb8-harvest
+git add data/
+git commit -m "Update instrument data"
+```
 
 Exit codes: `0` success, `2` configuration error, `3` Trading212 API error, `4` invalid payload or
 write failure.
@@ -160,6 +168,9 @@ These hooks block the commit on any finding:
 uv lock --upgrade-package <package>
 uv sync
 ```
+
+`detect-secrets` also scans `data/`, but skips lines that are exactly an ISIN field: some ISINs
+(e.g. `CA03464C2058`) are all hex characters and would otherwise be flagged as keys.
 
 The [Dependency Audit](.github/workflows/dependency-audit.yml) workflow also runs `pip-audit` daily.
 `uv` ignores package versions published in the last 7 days (`exclude-newer` in `pyproject.toml`);

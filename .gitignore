@@ -24,10 +24,6 @@ htmlcov/
 *.json.secret
 service-account*.json
 
-# Harvested data (regenerate with `uv run t2bb8-harvest`)
-data/*
-!data/.gitkeep
-
 # IDE
 .idea/
 .vscode/
