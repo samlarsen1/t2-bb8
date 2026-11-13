@@ -1,0 +1,15 @@
+{
+  "harvestedAt": "2026-11-13T21:01:23.889075+00:00",
+  "baseUrl": "https://live.trading212.com",
+  "instrumentCount": 18595,
+  "exchangeCount": 17,
+  "rawInstrumentCount": 18595,
+  "invalidInstruments": 0,
+  "unmatchedSchedules": 0,
+  "duplicateTickers": 0,
+  "instrumentTypes": {
+    "ETF": 6414,
+    "STOCK": 12158,
+    "WARRANT": 23
+  }
+}

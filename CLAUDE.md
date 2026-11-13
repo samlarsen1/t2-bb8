@@ -15,7 +15,7 @@ uv run t2bb8-harvest [--data-dir DIR]    # harvest (needs .env with T212_API_KEY
 
 - **README.md is the developer entry point**: any new run/setup/test/lint command, output file or env var must be documented there with copy-paste-ready commands (Quick Start, Local Setup, Output, Tests, Linters, Env Vars table, Troubleshooting).
 - **Never commit secrets.** Secrets live in `.env` (gitignored); document vars in `.env.example` with placeholders. Don't log exception messages that may contain sensitive data. Tests must never read `.env`.
-- **Never commit harvested data.** `data/` is gitignored apart from `.gitkeep`.
+- **Harvested data in `data/` is committed.** Outputs must never include credentials or account details (the manifest records only the base URL).
 - Keep every attribute the API returns: models use `extra="allow"` and records keep the raw keys.
 - Outputs are only `instruments.json`, `exchanges.json`, `manifest.json` and `last-run.txt` (written last, UTC ISO timestamp); each run deletes the previous ones first. No CSV output. Deletion must only match those names, never other files in the data dir.
 - Respect Trading212 rate limits (instruments 1 req/50s, exchanges 1 req/30s); don't add loops that hammer the API.

@@ -22,7 +22,13 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: [--baseline, .secrets.baseline]
+        # ISINs in data/instruments.json (e.g. CA03464C2058) look like hex keys; skip only lines
+        # that are exactly a well-formed ISIN field so the rest of data/ is still scanned.
+        args:
+          - --baseline
+          - .secrets.baseline
+          - --exclude-lines
+          - '^\s*"isin": "[A-Z]{2}[A-Z0-9]{9}[0-9]",?$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.10
