@@ -2,6 +2,21 @@
 
 uv project (Python 3.12), `src/t2bb8`: harvests Trading212 instrument + exchange metadata into `./data`.
 
+## System context
+
+Part of the T2 droid system. The hub repo is `../t2-hq` (https://github.com/samlarsen1/t2-hq):
+read its `ARCHITECTURE.md` and `PLAN.md` before changing how this repo interacts with the others.
+Repos sit side by side under `~/dev/git/samlarsen1/t2/` (development) and `~/dev/apps/` (deployed).
+
+- `../t2-d2`: buys dips; places buy orders on its own timers
+- `../t2-k2`: harvests gains from overbought holdings; places sell orders
+- `../t2-3po`: advisory council; reviews theses, strategy and configuration; read-only
+- `../t2-hq`: hub; plan, architecture, orchestrator and Telegram interface (planned)
+
+T2-BB8 supplies the list of instruments Trading212 offers. `t2-3po` uses it to check that any holding it suggests exists, with the exact Trading212 ticker.
+This repo must keep working standalone: never import a sibling repo's code. Changes to the
+shared droid contract (run reports, exit codes, locks) are agreed in `t2-hq` first.
+
 ## Commands
 
 ```bash

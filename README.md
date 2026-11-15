@@ -6,6 +6,23 @@ list, and stores them under `./data`.
 
 Sibling of [T2-D2](https://github.com/samlarsen1/t2-d2), with the same guardrails.
 
+## Part of the T2 system
+
+This repo is one of the T2 droids, coordinated from
+[t2-hq](https://github.com/samlarsen1/t2-hq), which holds the system
+[architecture](https://github.com/samlarsen1/t2-hq/blob/main/ARCHITECTURE.md) and
+[plan](https://github.com/samlarsen1/t2-hq/blob/main/PLAN.md).
+
+| Repo | Role |
+|---|---|
+| [t2-d2](https://github.com/samlarsen1/t2-d2) | buys dips; places buy orders on its own timers |
+| [t2-k2](https://github.com/samlarsen1/t2-k2) | harvests gains from overbought holdings; places sell orders |
+| **t2-bb8** (this repo) | harvests the Trading212 instrument list; metadata only |
+| [t2-3po](https://github.com/samlarsen1/t2-3po) | advisory council; reviews theses, strategy and configuration; read-only |
+| [t2-hq](https://github.com/samlarsen1/t2-hq) | hub: plan, architecture, and the orchestrator and Telegram interface (planned) |
+
+T2-BB8 supplies the list of instruments Trading212 offers. `t2-3po` uses it to check that any holding it suggests exists, with the exact Trading212 ticker. It runs on its own and doesn't need the other repos to be running.
+
 ---
 
 ## Architecture
