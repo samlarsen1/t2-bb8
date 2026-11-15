@@ -29,12 +29,14 @@ T2-BB8 supplies the list of instruments Trading212 offers. `t2-3po` uses it to c
 ```
 t2-bb8/
 ├── src/t2bb8/
-│   ├── cli.py       # `t2bb8-harvest` entrypoint, exit codes
+│   ├── cli.py       # `t2bb8-harvest` entrypoint: locks, run report, exit codes
 │   ├── config.py    # env var settings (T212_*)
 │   ├── client.py    # Trading212 metadata client, retries + rate-limit handling
 │   ├── models.py    # pydantic models (extra attributes are kept)
 │   ├── harvest.py   # delete previous outputs → fetch → validate → join exchanges → write
-│   └── storage.py   # atomic JSON/text writers
+│   ├── storage.py   # atomic JSON/text writers
+│   └── t2contract.py  # vendored from t2-hq: run reports, exit codes, locks
+├── deploy/systemd/  # unit templates installed by t2-hq's bin/t2-deploy
 ├── tests/           # mocked-API tests
 └── data/            # output (local only, not committed)
 ```
@@ -63,7 +65,7 @@ Instruments are linked to exchanges through `workingScheduleId`.
 # Install
 uv sync
 
-# Copy and fill in secrets (or symlink the same .env T2-D2 uses)
+# Copy and fill in secrets
 cp .env.example .env
 
 # Harvest into ./data
@@ -124,8 +126,26 @@ Instruments that fail validation (for example, no `ticker`) are skipped, logged 
 Harvested data is not committed: `data/` is gitignored apart from `.gitkeep`, so only code and
 configuration go to GitHub. Run `uv run t2bb8-harvest` to rebuild it on any machine.
 
-Exit codes: `0` success, `2` configuration error, `3` Trading212 API error, `4` invalid payload or
-write failure.
+### Run reports, exit codes and locks
+
+T2-BB8 follows the T2 droid contract (t2-hq `CONTRACT.md`):
+
+- **Run report.** Every run writes a JSON report to `var/runs/<UTC timestamp>-<command>.json`
+  (or `$T2_RUNS_DIR`). It records the version, command, start and end time, dry-run flag, status,
+  exit code, a one-line summary and errors. Its `result` holds the counts from `manifest.json` and the data directory. `--report PATH` writes it somewhere else.
+- **Exit codes:** `0` success, `1` the run failed, `2` configuration or usage error, `3` skipped
+  (a recent harvest, or a lock is held).
+- **One run at a time.** A second run while one is in progress exits `3` at once.
+- **The Trading212 account is shared.** Before calling Trading212 a run waits for the account lock,
+  which every droid takes, so droids on independent timers don't trip the per-account rate limits.
+  If it is still held after 10 minutes (`T2_T212_LOCK_TIMEOUT`, in seconds), the run exits `3`.
+
+Locks live in `/run/user/<uid>/t2` (or `$T2_LOCK_DIR`).
+
+```bash
+uv run t2bb8-harvest
+ls var/runs/
+```
 
 ### Development
 
@@ -206,6 +226,26 @@ Dependabot keeps GitHub Actions pinned to commit SHAs (`.github/dependabot.yml`)
 
 ---
 
+## Deployment
+
+t2-bb8 is deployed with t2-hq's `bin/t2-deploy`, which checks out a release tag in
+`$T2_APPS/t2-bb8`, builds its virtual environment and installs the systemd user units in
+`deploy/systemd/`:
+
+```bash
+# From the t2-hq checkout
+bin/t2-deploy release t2-bb8 v0.2.0   # tag a clean, tested main and push the tag
+bin/t2-deploy deploy t2-bb8           # deploy the newest tag
+bin/t2-deploy status
+```
+
+The units run `t2bb8-harvest --data-dir var/data` every Sunday at 06:00 UK time (`t2bb8.timer`).
+A run missed while the machine was off or asleep runs at the next start-up. Because of the
+20-hour guard, a manual run the day before is skipped, not repeated.
+
+The deploy never creates, reads or edits `.env`: write `$T2_APPS/t2-bb8/.env` from `.env.example`
+first, or the deploy stops before enabling anything.
+
 ## Environment Variables
 
 | Variable | Description |
@@ -213,6 +253,9 @@ Dependabot keeps GitHub Actions pinned to commit SHAs (`.github/dependabot.yml`)
 | `T212_API_KEY` | Trading212 API key (needs the Metadata permission) |
 | `T212_API_SECRET` | Trading212 API secret |
 | `T212_BASE_URL` | `https://live.trading212.com` (default) or `https://demo.trading212.com`; any other host is rejected |
+| `T2_RUNS_DIR` | Where run reports go (default `var/runs`) |
+| `T2_LOCK_DIR` | Where the run and Trading212 locks live (default `/run/user/<uid>/t2`) |
+| `T2_T212_LOCK_TIMEOUT` | Seconds to wait for the shared Trading212 lock before skipping (default `600`) |
 | `LOG_LEVEL` | `DEBUG`, `INFO` (default), `WARNING` or `ERROR` |
 
 `.env` is read from the directory you run the command in; variables already set in the shell win.

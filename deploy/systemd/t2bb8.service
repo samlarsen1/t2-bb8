@@ -1,0 +1,13 @@
+# Installed by t2-hq's bin/t2-deploy, which replaces @APP_DIR@ with the deployed app directory.
+[Unit]
+Description=T2-BB8 Trading212 instrument harvest
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@APP_DIR@
+ExecStart=@APP_DIR@/.venv/bin/t2bb8-harvest --data-dir var/data
+# Exit code 3 means skipped (recent harvest or a lock held), which is not a failure.
+SuccessExitStatus=3
+TimeoutStartSec=20min
