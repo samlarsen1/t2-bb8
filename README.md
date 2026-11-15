@@ -20,7 +20,7 @@ t2-bb8/
 │   ├── harvest.py   # delete previous outputs → fetch → validate → join exchanges → write
 │   └── storage.py   # atomic JSON/text writers
 ├── tests/           # mocked-API tests
-└── data/            # output (committed to git)
+└── data/            # output (local only, not committed)
 ```
 
 Each run calls two Trading212 endpoints:
@@ -105,13 +105,8 @@ half-written file.
 Instruments that fail validation (for example, no `ticker`) are skipped, logged as
 `instrument_invalid`, and counted in `manifest.json`.
 
-The `data/` folder is committed, so each harvest shows up as a diff. To record a new harvest:
-
-```bash
-uv run t2bb8-harvest
-git add data/
-git commit -m "Update instrument data"
-```
+Harvested data is not committed: `data/` is gitignored apart from `.gitkeep`, so only code and
+configuration go to GitHub. Run `uv run t2bb8-harvest` to rebuild it on any machine.
 
 Exit codes: `0` success, `2` configuration error, `3` Trading212 API error, `4` invalid payload or
 write failure.

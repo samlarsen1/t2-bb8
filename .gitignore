@@ -24,6 +24,11 @@ htmlcov/
 *.json.secret
 service-account*.json
 
+# Harvested data stays local; only code and configuration go to GitHub.
+# Regenerate it with `uv run t2bb8-harvest`.
+data/*
+!data/.gitkeep
+
 # IDE
 .idea/
 .vscode/
