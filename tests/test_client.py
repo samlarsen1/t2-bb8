@@ -85,7 +85,7 @@ def test_rate_limit_uses_ratelimit_reset_header(monkeypatch: pytest.MonkeyPatch)
     assert sleeps == [31.0]
 
 
-def test_rate_limit_zero_wait_falls_back_to_backoff() -> None:
+def test_rate_limit_zero_wait_still_waits_out_the_window() -> None:
     # Seen live: after waiting out the first 429, Trading212 sent more 429s saying "Retry-After: 0".
     sleeps: list[float] = []
     handler = sequence(
@@ -95,7 +95,8 @@ def test_rate_limit_zero_wait_falls_back_to_backoff() -> None:
     )
     with make_client(handler, sleeps) as client:
         assert client.get_instruments_raw() == INSTRUMENTS
-    assert sleeps == [30.0, 4.0]
+    # Instruments allow one request per 50s, so every retry waits at least 51s.
+    assert sleeps == [51.0, 51.0]
 
 
 def test_rate_limit_wait_is_capped() -> None:
@@ -115,8 +116,8 @@ def test_rate_limit_exhausted_raises() -> None:
     with make_client(handler, sleeps) as client, pytest.raises(Trading212Error) as exc_info:
         client.get_instruments_raw()
     assert exc_info.value.status_code == 429
-    # Exponential backoff without headers: 2**1, 2**2
-    assert sleeps == [2.0, 4.0]
+    # Without headers, the endpoint's window (50s + 1s) is longer than the backoff.
+    assert sleeps == [51.0, 51.0]
 
 
 def test_server_error_is_retried() -> None:
@@ -127,7 +128,48 @@ def test_server_error_is_retried() -> None:
     )
     with make_client(handler, sleeps) as client:
         assert client.get_instruments_raw() == INSTRUMENTS
-    assert sleeps == [2.0]
+    assert sleeps == [51.0]
+
+
+def test_exchanges_retry_waits_out_their_shorter_window() -> None:
+    sleeps: list[float] = []
+    handler = sequence(httpx.ReadTimeout("timed out"), httpx.Response(200, json=EXCHANGES))
+    with make_client(handler, sleeps) as client:
+        assert client.get_exchanges_raw() == EXCHANGES
+    assert sleeps == [31.0]
+
+
+def test_backoff_longer_than_the_window_is_used() -> None:
+    sleeps: list[float] = []
+    handler = sequence(*[httpx.Response(503) for _ in range(3)], httpx.Response(200, json=[]))
+    client = Trading212Client(
+        "key",
+        "secret",
+        max_attempts=4,
+        backoff_base=6.0,
+        sleep=sleeps.append,
+        transport=httpx.MockTransport(handler),
+    )
+    with client:
+        client.get_exchanges_raw()
+    # 6**1 and 6**2 are inside the 31s floor; 6**3 = 216 is capped at 120.
+    assert sleeps == [31.0, 36.0, 120.0]
+
+
+def test_default_is_three_attempts() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(429)
+
+    client = Trading212Client(
+        "key", "secret", sleep=lambda _: None, transport=httpx.MockTransport(handler)
+    )
+    with client, pytest.raises(Trading212Error):
+        client.get_instruments_raw()
+    assert calls == 3
 
 
 def test_timeout_is_retried_then_raises() -> None:

@@ -202,6 +202,21 @@ def build_records(
     return records, exchange_summaries, counts
 
 
+def last_run(data_dir: Path) -> datetime | None:
+    """When the last successful harvest into ``data_dir`` finished, or ``None`` if unknown.
+
+    A missing or unreadable ``last-run.txt`` counts as unknown, so it never blocks a harvest.
+    """
+    try:
+        text = (data_dir / LAST_RUN_FILE).read_text().strip()
+        stamp = datetime.fromisoformat(text)
+    except (OSError, ValueError):
+        return None
+    if stamp.tzinfo is None:
+        return None
+    return stamp.astimezone(UTC)
+
+
 def harvest(
     source: MetadataSource,
     data_dir: Path,

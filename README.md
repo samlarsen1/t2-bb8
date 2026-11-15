@@ -37,7 +37,7 @@ t2-bb8/
 │   ├── harvest.py   # delete previous outputs → fetch → validate → join exchanges → write
 │   └── storage.py   # atomic JSON/text writers
 ├── tests/           # mocked-API tests
-└── data/            # output (committed to git)
+└── data/            # output (local only, not committed)
 ```
 
 Each run calls two Trading212 endpoints:
@@ -72,12 +72,28 @@ uv run t2bb8-harvest
 
 # Harvest somewhere else
 uv run t2bb8-harvest --data-dir /tmp/t212-data
+
+# Harvest again even though the last harvest was recent
+uv run t2bb8-harvest --force
 ```
 
-A run takes a few seconds unless Trading212 rate-limits it; on HTTP 429 the client waits for the
-time the server asks plus 1s (at least the normal backoff, at most 120s) and retries, up to 4
-attempts. Timeouts, network errors and
-5xx responses are retried with exponential backoff.
+### Staying inside the rate limits
+
+The harvester is deliberately conservative, so the shared Trading212 key is never blocked:
+
+- **One harvest a day at most.** If the data directory's `last-run.txt` is less than 20 hours old,
+  the run logs `harvest_skipped` and exits 0 without calling Trading212 or touching the data.
+  Change the threshold with `--min-age-hours`, or pass `--force`. A missing or unreadable
+  `last-run.txt` never blocks a run.
+- **Two requests per harvest:** one to each endpoint, one after the other.
+- **No retry inside an endpoint's window.** A failed, timed-out or rate-limited request may still
+  count against the limit, so a retry waits at least the endpoint's interval plus 1s (51s for
+  instruments, 31s for exchanges). It waits longer if the server's `Retry-After` or
+  `x-ratelimit-reset` header asks for more, up to 120s.
+- **Three attempts at most** per endpoint, so a run that keeps failing stops after about two minutes
+  of waiting instead of hammering the API.
+
+A normal run takes a few seconds.
 
 ### Output
 
@@ -106,13 +122,8 @@ half-written file.
 Instruments that fail validation (for example, no `ticker`) are skipped, logged as
 `instrument_invalid`, and counted in `manifest.json`.
 
-The `data/` folder is committed, so each harvest shows up as a diff. To record a new harvest:
-
-```bash
-uv run t2bb8-harvest
-git add data/
-git commit -m "Update instrument data"
-```
+Harvested data is not committed: `data/` is gitignored apart from `.gitkeep`, so only code and
+configuration go to GitHub. Run `uv run t2bb8-harvest` to rebuild it on any machine.
 
 Exit codes: `0` success, `2` configuration error, `3` Trading212 API error, `4` invalid payload or
 write failure.
@@ -215,7 +226,8 @@ Dependabot keeps GitHub Actions pinned to commit SHAs (`.github/dependabot.yml`)
 |---------|-----|
 | `config_error` … `Missing required environment variables` | Create `.env` from `.env.example`, or export the variables |
 | `t212_api_error` with `status=401` / `403` | Check the key and secret, and that the key has the Metadata permission. Demo keys only work with the demo URL |
-| `t212_api_error` with `status=429` | Another process is using the same key; wait a minute and re-run |
+| `t212_api_error` with `status=429` | Another process is using the same key; wait a minute and re-run with `--force` |
+| `harvest_skipped` with `reason=recent_harvest` | The last harvest is under 20 hours old, so nothing was fetched. Pass `--force` to harvest anyway |
 | `t212_payload_invalid` | Trading212 changed the exchanges response; update `models.py` (run with `LOG_LEVEL=DEBUG` for detail) |
 | Many `instrument_invalid` warnings | The warnings list the failing fields; update `models.py` to match |
 | No files in `data/` after a run | The run failed after deleting the previous files; check the log, fix the cause and re-run |

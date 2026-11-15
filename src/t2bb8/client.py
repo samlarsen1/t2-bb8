@@ -22,6 +22,10 @@ log = structlog.get_logger(__name__)
 INSTRUMENTS_PATH = "/api/v0/equity/metadata/instruments"
 EXCHANGES_PATH = "/api/v0/equity/metadata/exchanges"
 
+# Trading212's documented limit for each endpoint: one request per this many seconds. A failed,
+# timed-out or rate-limited request may still count against it, so a retry never comes sooner.
+ENDPOINT_INTERVALS = {INSTRUMENTS_PATH: 50.0, EXCHANGES_PATH: 30.0}
+
 # Upper bound on any single wait, so a bad header can't stall the process indefinitely.
 MAX_WAIT_SECONDS = 120.0
 # Added to server-provided waits, which are rounded to whole seconds.
@@ -69,8 +73,10 @@ def _retry_wait(response: httpx.Response, now: float) -> float | None:
 class Trading212Client:
     """Synchronous Trading212 client. Use as a context manager.
 
-    Retries timeouts, network errors, HTTP 429 and 5xx responses with backoff, honouring the
-    server's rate-limit headers when present.
+    Retries timeouts, network errors, HTTP 429 and 5xx responses, honouring the server's
+    rate-limit headers when present. Every retry waits at least the endpoint's documented
+    interval (``ENDPOINT_INTERVALS``), so the client never sends a request the rate limit
+    would reject.
 
     Args:
         api_key: Trading212 API key.
@@ -89,7 +95,7 @@ class Trading212Client:
         api_secret: str,
         base_url: str = LIVE_BASE_URL,
         timeout: float = 60.0,
-        max_attempts: int = 4,
+        max_attempts: int = 3,
         backoff_base: float = 2.0,
         sleep: Callable[[float], None] = time.sleep,
         transport: httpx.BaseTransport | None = None,
@@ -151,10 +157,13 @@ class Trading212Client:
                     raise Trading212Error(
                         exc.status_code, f"{exc.reason} after {attempt} attempts"
                     ) from exc
-                backoff = self._backoff_base**attempt
-                # Rate-limit headers are whole seconds, so pad them; never wait less than the
-                # backoff, or a "reset in 0s" header would retry immediately into another 429.
-                wait = backoff if exc.wait is None else max(exc.wait + RATE_LIMIT_MARGIN, backoff)
+                # Never retry inside the endpoint's rate-limit window, and never wait less than
+                # the backoff, or a "reset in 0s" header would retry immediately into another 429.
+                # Rate-limit headers are whole seconds, so pad them.
+                floor = ENDPOINT_INTERVALS.get(path, 0.0) + RATE_LIMIT_MARGIN
+                wait = max(self._backoff_base**attempt, floor)
+                if exc.wait is not None:
+                    wait = max(wait, exc.wait + RATE_LIMIT_MARGIN)
                 wait = min(wait, MAX_WAIT_SECONDS)
                 log.warning(
                     "t212_request_retry",
