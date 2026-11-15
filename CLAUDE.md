@@ -4,9 +4,9 @@ uv project (Python 3.12), `src/t2bb8`: harvests Trading212 instrument + exchange
 
 ## System context
 
-Part of the T2 droid system. The hub repo is `../t2-hq` (https://github.com/samlarsen1/t2-hq):
+Part of the T2 droid system. The hub repo is `../t2-hq`:
 read its `ARCHITECTURE.md` and `PLAN.md` before changing how this repo interacts with the others.
-Repos sit side by side under `~/dev/git/samlarsen1/t2/` (development) and `~/dev/apps/` (deployed).
+Repos sit side by side in one development directory (`$T2_SRC`) and one apps directory (`$T2_APPS`).
 
 - `../t2-d2`: buys dips; places buy orders on its own timers
 - `../t2-k2`: harvests gains from overbought holdings; places sell orders
