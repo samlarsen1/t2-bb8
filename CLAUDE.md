@@ -11,7 +11,7 @@ Repos sit side by side in one development directory (`$T2_SRC`) and one apps dir
 - `../t2-d2`: buys dips; places buy orders on its own timers
 - `../t2-k2`: harvests gains from overbought holdings; places sell orders
 - `../t2-3po`: advisory council; reviews theses, strategy and configuration; read-only
-- `../t2-hq`: hub; plan, architecture, orchestrator and Telegram interface (planned)
+- `../t2-hq`: hub; plan, architecture, orchestrator and Telegram interface
 
 T2-BB8 supplies the list of instruments Trading212 offers. `t2-3po` uses it to check that any holding it suggests exists, with the exact Trading212 ticker.
 This repo must keep working standalone: never import a sibling repo's code. Changes to the

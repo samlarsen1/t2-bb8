@@ -18,7 +18,7 @@ GitHub owner as this one.
 | `t2-k2` | harvests gains from overbought holdings; places sell orders |
 | **t2-bb8** (this repo) | harvests the Trading212 instrument list; metadata only |
 | `t2-3po` | advisory council; reviews theses, strategy and configuration; read-only |
-| `t2-hq` | hub: plan, architecture, and the orchestrator and Telegram interface (planned) |
+| `t2-hq` | hub: plan, architecture, and the orchestrator and Telegram interface |
 
 T2-BB8 supplies the list of instruments Trading212 offers. `t2-3po` uses it to check that any holding it suggests exists, with the exact Trading212 ticker. It runs on its own and doesn't need the other repos to be running.
 
